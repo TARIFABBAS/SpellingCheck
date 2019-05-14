@@ -14,25 +14,13 @@ public class SpellChecker {
 
 	private static String[] hashTable;
 	/** number of words to be spell-checked */
-	private static int n = 0;
+	private static int numberOfWords = 0;
 	/** number of misspelled or questionable words */
-	private static int qWords = 0;
-	/** total number of probes made during the linear probe search */
-	private static int probeCount = 0;
-	/** average number of probes per word */
-	private static double avgProbe = 0;
-	/** total number of lookups made */
-	private static int lookUpCount = 0;
-	/** average number of probes per lookup */
-	private static double avgLookUp = 0;
-	/** output printstream */
+	private static int wordsNotFoundInDictionary = 0;
+
 	private static PrintStream out;
 
 	/**
-	 * The user is prompted for a dictionary file, an input file, and an output file. The provided file is files/dict.txt, and the hash function and hash table are based on a dictionary with
-	 * approximately 25,000 words.
-	 * 
-	 * The Program will then read in the words from the dictionary, run a spell check on the input, and then print the results to the output file
 	 * 
 	 * @param args
 	 *            command line arguments
@@ -40,42 +28,41 @@ public class SpellChecker {
 	 *             if the input and/or dictionary files are not found
 	 */
 	public static void main(String[] args) throws FileNotFoundException {
-		// ---- get data from user ----
-		File dict = new File(System.getProperty("user.dir") + File.separator + "lib" + File.separator + "dictionary.txt");
-		File input = new File(System.getProperty("user.dir") + File.separator + "input" + File.separator + "input1.txt");
-		File output = new File(System.getProperty("user.dir") + File.separator + "output" + File.separator + System.currentTimeMillis() + ".txt");
+		// Create the output folder
+		createOutputFolder();
 
-		out = new PrintStream(output);
+		File dictionaryFile = new File(System.getProperty("user.dir") + File.separator + "lib" + File.separator + "dictionary.txt");
+		File inputFile = new File(System.getProperty("user.dir") + File.separator + "input" + File.separator + "input1.txt");
+		File outputFile = new File(System.getProperty("user.dir") + File.separator + "output" + File.separator + System.currentTimeMillis() + ".txt");
+
+		out = new PrintStream(outputFile);
 
 		// Build a new hash table and fill it with the words from the
 		// dictionary
-		buildHashTable(dict);
+		buildHashTable(dictionaryFile);
 
 		// ---- Output the Results ----
 		out.println("=============================================");
 		out.println("===== Misspelled/ Questionable Words: =======");
 		out.println("=============================================");
 
-		processWords(input);
-
-		avgProbe = probeCount / (double) n;
-		avgLookUp = probeCount / (double) lookUpCount;
+		processWords(inputFile);
 
 		out.println("=============================================");
 		out.printf("Number of words in dictionary: %d \n", wordsCountInDictionary);
-		out.printf("Number of words to be examined: %d \n", n);
-		out.printf("Number of misspelled/ questionable words: %d \n", qWords);
+		out.printf("Number of words to be examined: %d \n", numberOfWords);
+		out.printf("Number of misspelled/ questionable words: %d \n", wordsNotFoundInDictionary);
 		out.println("=============================================");
-		out.printf("Total number of probes: %d \n", probeCount);
-		out.printf("Average number of probes per word: %.2f \n", avgProbe);
-		out.printf("Average number of probes per lookup: %.2f \n", avgLookUp);
 
-		out.println("=============================================");
+	}
+
+	private static void createOutputFolder() {
+		File output = new File(System.getProperty("user.dir") + File.separator + "output");
+		output.mkdir();
+
 	}
 
 	/**
-	 * Build the hash table using the words in the dictionary file The hash table size is based on the results of the performance calculation based on a dictionary of approximately 25000 words and a
-	 * goal of 3 probes per word
 	 * 
 	 * @param dict
 	 *            dictionary of words to add to the hash table
@@ -104,21 +91,22 @@ public class SpellChecker {
 	}
 
 	/**
-	 * Reads the input file word by word, ensuring that the words are in the proper format before checking them against the dictionary
+	 * 
 	 * 
 	 * @param input
 	 * @throws FileNotFoundException
 	 */
 	private static void processWords(File input) throws FileNotFoundException {
+		// Reads the input file word by word, ensuring that the words are in the proper format before checking them against the dictionary
 		Scanner in = new Scanner(input);
 		boolean found = false;
 		while (in.hasNext()) {
 			String s = format(in.next());
 
-			n++;
+			numberOfWords++;
 			found = spellCheck(s);
 			if (!found) {
-				qWords++;
+				wordsNotFoundInDictionary++;
 				out.println(s);
 			}
 		}
@@ -128,28 +116,17 @@ public class SpellChecker {
 	}
 
 	/**
-	 * Repeatedly checks a word using different spelling variations until it is determined that the word cannot be found in the dictionary.
 	 * 
-	 * If the word ends in 's, then the possessive is removed and the word is checked again. If the word is plural, the s / es ending is removed and the word is checked again. If the word is a
-	 * past-tense verb, the -d/ -ed is removed and the word is checked again. If the word ends in -ing, the suffix is removed and the word is checked again. If the word ends in -er, the suffix is
-	 * removed and the word is checked again
 	 * 
-	 * This is not a comprehensive spellchecker; some misspelled words will make it through the system, while some correctly spelled words will be marked as incorrect, depending on how thorough the
-	 * dictionary file is to begin with.
-	 * 
-	 * IE: In the sample dictionary files/dict.txt, "family" is correct, but "families" would be marked incorrect.
-	 * 
-	 * @param s
+	 * @param word
 	 * @return
 	 */
-	private static boolean spellCheck(String s) {
-		lookUpCount++;
-		int index = hashFunction(s);
+	private static boolean spellCheck(String word) {
+		int index = hashFunction(word);
 		while (hashTable[index] != null) {
-			if (s.equals(hashTable[index])) {
+			if (word.equals(hashTable[index])) {
 				return true;
 			} else {
-				probeCount++;
 				index++;
 			}
 		}
@@ -160,49 +137,49 @@ public class SpellChecker {
 		// Because all single letters are in the dictionary, any word that
 		// reaches this point is guaranteed to have at least 2 characters, so we
 		// do not need to test for length before assigning the end string
-		if (Character.isUpperCase(s.charAt(0))) {
-			s = s.toLowerCase();
-			return spellCheck(s);
+		if (Character.isUpperCase(word.charAt(0))) {
+			word = word.toLowerCase();
+			return spellCheck(word);
 		}
 		String end = "";
-		if (s.length() >= 2) {
-			end = s.substring(s.length() - 2);
+		if (word.length() >= 2) {
+			end = word.substring(word.length() - 2);
 		}
-		char fin = s.charAt(s.length() - 1);
+		char fin = word.charAt(word.length() - 1);
 		// However, we do need to check that a string has three characters
 		// before assigning the 3-char end string to check for 'ing'
 		String ing = "";
-		if (s.length() > 3) {
-			ing = s.substring(s.length() - 3);
+		if (word.length() > 3) {
+			ing = word.substring(word.length() - 3);
 		}
 		if (ing.equals("ing")) {
-			s = s.substring(0, s.length() - 3);
-			return spellCheck(s);
+			word = word.substring(0, word.length() - 3);
+			return spellCheck(word);
 		} else if (end.equals("ly") || end.equals("'s")) {
-			s = s.substring(0, s.length() - 2);
-			return spellCheck(s);
+			word = word.substring(0, word.length() - 2);
+			return spellCheck(word);
 		} else if (fin == 's') {
-			s = s.substring(0, s.length() - 1);
-			Boolean finFound = spellCheck(s);
-			if (!finFound && s.charAt(s.length() - 1) == 'e') {
-				s = s.substring(0, s.length() - 1);
-				finFound = spellCheck(s);
+			word = word.substring(0, word.length() - 1);
+			Boolean finFound = spellCheck(word);
+			if (!finFound && word.charAt(word.length() - 1) == 'e') {
+				word = word.substring(0, word.length() - 1);
+				finFound = spellCheck(word);
 			}
 			return finFound;
 		} else if (fin == 'd') {
-			s = s.substring(0, s.length() - 1);
-			Boolean finFound = spellCheck(s);
-			if (!finFound && s.charAt(s.length() - 1) == 'e') {
-				s = s.substring(0, s.length() - 1);
-				finFound = spellCheck(s);
+			word = word.substring(0, word.length() - 1);
+			Boolean finFound = spellCheck(word);
+			if (!finFound && word.charAt(word.length() - 1) == 'e') {
+				word = word.substring(0, word.length() - 1);
+				finFound = spellCheck(word);
 			}
 			return finFound;
 		} else if (fin == 'r') {
-			s = s.substring(0, s.length() - 1);
-			Boolean finFound = spellCheck(s);
-			if (!finFound && s.charAt(s.length() - 1) == 'e') {
-				s = s.substring(0, s.length() - 1);
-				finFound = spellCheck(s);
+			word = word.substring(0, word.length() - 1);
+			Boolean finFound = spellCheck(word);
+			if (!finFound && word.charAt(word.length() - 1) == 'e') {
+				word = word.substring(0, word.length() - 1);
+				finFound = spellCheck(word);
 			}
 			return finFound;
 		}
@@ -212,12 +189,13 @@ public class SpellChecker {
 	}
 
 	/**
-	 * Before spell-checking the word, it should be formatted to ensure that no leading/ trailing punctuation mark will cause it to be erroneously flagged as misspelled
+	 * 
 	 * 
 	 * @param s
 	 * @return
 	 */
 	private static String format(String s) {
+		// Removing any special symbol if found
 		if (!Character.isLetterOrDigit(s.charAt(0)) && s.length() > 1) {
 			s = s.substring(1);
 		}
@@ -231,8 +209,6 @@ public class SpellChecker {
 	}
 
 	/**
-	 * The hash function assigns an index value to each word into the hash table. The goal of the hash function is to reduce collisions within the table so that search functions can be performed
-	 * efficiently
 	 * 
 	 * @param s
 	 *            the word to hash
